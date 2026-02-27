@@ -1,0 +1,32 @@
+# QRadar Offense Collector Configuration
+# Environment variables override these values.
+
+qradar:
+  # QRadar REST API base URL (env: QRADAR_BASE_URL)
+  base_url: https://qradar.company.local/api
+  # API authentication token (env: QRADAR_API_TOKEN)
+  api_token: your_token_here
+  # API version (env: QRADAR_VERSION)
+  version: "20.0"
+  # Skip TLS certificate verification for self-signed certs (env: QRADAR_TLS_INSECURE)
+  tls_insecure: false
+
+destination:
+  # External ingestion API endpoint (env: DESTINATION_URL)
+  url: http://localhost:8001/api/v1/ingest/offense
+  # API key for authentication (env: DESTINATION_API_KEY)
+  api_key: Qradar2025agentsAi
+
+collector:
+  # Polling interval in seconds (env: POLL_INTERVAL_SECONDS)
+  poll_interval_seconds: 60
+  # Path to state persistence file (env: STATE_FILE)
+  state_file: ./state.json
+  # HTTP client timeout in seconds (env: HTTP_TIMEOUT_SECONDS)
+  http_timeout_seconds: 30
+  # Number of concurrent workers for processing offenses
+  worker_count: 5
+
+logging:
+  # Log level: debug, info, warn, error (env: LOG_LEVEL)
+  level: info

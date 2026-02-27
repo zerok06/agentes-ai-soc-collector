@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  qradar-collector:
+    build: .
+    container_name: qradar-collector
+    restart: unless-stopped
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./state.json:/app/state.json
+    environment:
+      # These environment variables will override config.yaml if set.
+      # You can put secrets here or in a .env file locally.
+      - QRADAR_BASE_URL=${QRADAR_BASE_URL:-https://qradar.company.local/api}
+      - QRADAR_API_TOKEN=${QRADAR_API_TOKEN}
+      - QRADAR_VERSION=${QRADAR_VERSION:-20.0}
+      - DESTINATION_URL=${DESTINATION_URL:-http://localhost:8001/api/v1/ingest/offense}
+      - DESTINATION_API_KEY=${DESTINATION_API_KEY}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-60}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
