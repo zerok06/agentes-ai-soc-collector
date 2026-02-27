@@ -52,7 +52,7 @@ The recommended and fully supported deployment method for this collector is via 
 1. **Clone or transfer the project** to your Ubuntu server:
 
    ```bash
-   git clone <tu-repo> /opt/qradar-collector
+   git clone https://github.com/zerok06/agentes-ai-soc-collector.git /opt/qradar-collector
    cd /opt/qradar-collector
    ```
 
