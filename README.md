@@ -37,68 +37,51 @@ Configuration is provided via a `config.yaml` file natively, but all values can 
 
 ---
 
-## Quick Start (Docker)
+## Quick Start & Production Deployment (Docker Compose)
 
-This is the recommended approach for development and testing.
+The recommended and fully supported deployment method for this collector is via **Docker Compose**. This ensures perfect environment isolation, automatic restarts, and zero host dependencies.
 
-1. Create a `.env` file from the example template to contain your secrets:
+### Prerequisites
+- Docker engine installed on the target server.
+- Docker Compose v2 installed.
+
+### Step-by-step Guide
+
+1. **Clone or transfer the project** to your Ubuntu server:
+   ```bash
+   git clone <tu-repo> /opt/qradar-collector
+   cd /opt/qradar-collector
+   ```
+
+2. **Configure your Secrets (`.env`)**
+   Copy the example environment file and fill in your actual production tokens.
    ```bash
    cp .env.example .env
+   nano .env
    ```
-2. Edit `.env` to include your actual tokens:
-   ```env
-   QRADAR_API_TOKEN=your_secure_token_here
-   DESTINATION_API_KEY=your_secure_destination_key
-   ```
-3. Start the collector:
+   *Note: Never commit `.env` to source control.*
+
+3. **Start the Collector in the Background**
+   Build the lightweight Alpine image and start the container in detached mode:
    ```bash
-   make docker-up
-   # or
-   docker compose up --build -d
+   docker compose up -d --build
    ```
-3. View the logs:
+   *The `--build` flag ensures the Go binary is freshly compiled.*
+
+4. **Verify the Deployment**
+   Check the logs to ensure it successfully connected to QRadar and loaded the state:
    ```bash
    docker compose logs -f
    ```
+   *(Press `Ctrl+C` to exit the logs view)*
 
----
+5. **Managing the Service**
+   - **Stop the collector:** `docker compose down`
+   - **Restart the collector:** `docker compose restart`
+   - **Check status:** `docker compose ps`
 
-## Production Deployment (Native/Systemd)
-
-For maximum performance on an Ubuntu/Debian production asset:
-
-1. Compile the binary for Linux:
-   ```bash
-   make build-linux
-   # Output: qradar-collector
-   ```
-
-2. Prepare the production directory:
-   ```bash
-   sudo mkdir -p /opt/qradar-collector
-   sudo useradd -rs /bin/false qradar
-   sudo chown qradar:qradar /opt/qradar-collector
-   ```
-
-3. Deploy the binary and configuration:
-   ```bash
-   sudo cp qradar-collector /opt/qradar-collector/
-   sudo cp config.yaml /opt/qradar-collector/
-   
-   # Setup environment overrides securely
-   echo "QRADAR_API_TOKEN=your_token" | sudo tee /opt/qradar-collector/.env
-   echo "DESTINATION_API_KEY=your_key" | sudo tee -a /opt/qradar-collector/.env
-   ```
-
-4. Install and enable the systemd service:
-   ```bash
-   sudo cp deploy/qradar-collector.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable qradar-collector
-   sudo systemctl start qradar-collector
-   ```
-
-5. Monitor the service logs:
-   ```bash
-   sudo journalctl -fu qradar-collector
-   ```
+### Troubleshooting & Logs
+All structured JSON logs and connection errors are routed to `stdout` and captured by Docker. You can filter logs natively:
+```bash
+docker compose logs --tail=100 -f
+```
