@@ -1,69 +1,69 @@
-# QRadar Offense Collector & Forwarder
+# Recolector y Reenviador de Ofensas de QRadar
 
-A production-grade microservice written in Go that acts as a bridge between IBM QRadar SIEM and an external ingestion API.
+Un microservicio de grado de producción escrito en Go que actúa como puente entre IBM QRadar SIEM y una API de ingesta externa.
 
-## Architecture
+## Arquitectura
 
-1. **Polls QRadar SIEM**: Periodically queries the `GET /siem/offenses` endpoint for new or updated offenses since the last successful poll.
-2. **Event Enrichment**: For each active offense, generates an asynchronous AQL search via `POST /ariel/searches` to retrieve associated event details, polling until complete.
-3. **Data Transformation**: Maps the QRadar API responses into a predefined custom JSON schema.
-4. **Forwarding**: Sends the structured JSON payload to the external destination API via `POST` requests.
-5. **State Management**: Persistently tracks the latest processed timestamp in `state.json` to guarantee precise resume capability after restarts.
+1. **Consulta QRadar SIEM**: Consulta periódicamente el endpoint `GET /siem/offenses` para buscar ofensas nuevas o actualizadas desde la última consulta exitosa.
+2. **Enriquecimiento de Eventos**: Para cada ofensa activa, genera una búsqueda AQL asíncrona a través de `POST /ariel/searches` para recuperar los detalles asociados del evento, consultando hasta que se complete.
+3. **Transformación de Datos**: Mapea las respuestas de la API de QRadar en un esquema JSON personalizado predefinido.
+4. **Reenvío**: Envía el payload JSON estructurado a la API de destino externa mediante solicitudes `POST`.
+5. **Gestión de Estado**: Rastrea persistentemente la última marca de tiempo procesada en `state.json` para garantizar la capacidad de reanudación precisa después de reinicios.
 
-## Features
+## Características
 
-- Highly concurrent event processing using a worker pool pattern.
-- Robust HTTP client with connection pooling and timeouts.
-- Exponential backoff retry logic for resilience against QRadar or Destination API transient failures.
-- Zero dependencies outside of `go.uber.org/zap` (logging) and `gopkg.in/yaml.v3` (config).
-- Memory efficient (`< 50MB` RAM) and lightweight container image (`~15MB`).
-
----
-
-## Configuration
-
-Configuration is provided via a `config.yaml` file natively, but all values can be securely overridden environment variables:
-
-| Environment Variable    | Description                                                           |
-| ----------------------- | --------------------------------------------------------------------- |
-| `QRADAR_BASE_URL`       | Base URL of the QRadar API (e.g., `https://qradar.company.local/api`) |
-| `QRADAR_API_TOKEN`      | Authorized Service Token (SEC)                                        |
-| `QRADAR_VERSION`        | Target API version (default: `20.0`)                                  |
-| `QRADAR_TLS_INSECURE`   | Set to `true` to skip certificate validation (default: `false`)       |
-| `DESTINATION_URL`       | External ingestion API endpoint                                       |
-| `DESTINATION_API_KEY`   | API key sent in the `x-api-key` header                                |
-| `POLL_INTERVAL_SECONDS` | How often to check for offenses (default: `60`)                       |
-| `STATE_FILE`            | Local file to persist timestamp (default: `./state.json`)             |
-| `LOG_LEVEL`             | Logging level: `debug`, `info`, `warn`, `error`                       |
+- Procesamiento de eventos altamente concurrente utilizando un patrón de grupo de trabajadores (worker pool).
+- Cliente HTTP robusto con agrupación de conexiones (connection pooling) y tiempos de espera (timeouts).
+- Lógica de reintento con retroceso exponencial (exponential backoff) para resiliencia frente a fallas transitorias de QRadar o la API de destino.
+- Cero dependencias fuera de `go.uber.org/zap` (registro) y `gopkg.in/yaml.v3` (configuración).
+- Eficiente en memoria (RAM `< 50MB`) e imagen de contenedor ligera (`~15MB`).
 
 ---
 
-## Quick Start & Production Deployment (Docker Compose)
+## Configuración
 
-The recommended and fully supported deployment method for this collector is via **Docker Compose**. This ensures perfect environment isolation, automatic restarts, and zero host dependencies.
+La configuración se proporciona de forma nativa a través de un archivo `config.yaml`, pero todos los valores se pueden sobrescribir de forma segura mediante variables de entorno:
 
-### Prerequisites
+| Variable de Entorno     | Descripción                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `QRADAR_BASE_URL`       | URL base de la API de QRadar (ej., `https://qradar.company.local/api`)                 |
+| `QRADAR_API_TOKEN`      | Token de Servicio Autorizado (SEC)                                                     |
+| `QRADAR_VERSION`        | Versión de API objetivo (por defecto: `20.0`)                                          |
+| `QRADAR_TLS_INSECURE`   | Establécelo en `true` para omitir la validación del certificado (por defecto: `false`) |
+| `DESTINATION_URL`       | Endpoint de la API de ingesta externa                                                  |
+| `DESTINATION_API_KEY`   | Clave de API enviada en el encabezado `x-api-key`                                      |
+| `POLL_INTERVAL_SECONDS` | Con qué frecuencia verificar ofensas (por defecto: `60`)                               |
+| `STATE_FILE`            | Archivo local para persistir la marca de tiempo (por defecto: `./state.json`)          |
+| `LOG_LEVEL`             | Nivel de registro: `debug`, `info`, `warn`, `error`                                    |
 
-- Docker engine installed on the target server.
-- Docker Compose v2 installed.
+---
 
-### Step-by-step Guide
+## Inicio Rápido y Despliegue en Producción (Docker Compose)
 
-1. **Clone or transfer the project** to your Ubuntu server:
+El método de despliegue recomendado y totalmente compatible para este recolector es a través de **Docker Compose**. Esto garantiza un aislamiento de entorno perfecto, reinicios automáticos y cero dependencias del host.
+
+### Prerrequisitos
+
+- Motor de Docker instalado en el servidor objetivo.
+- Docker Compose v2 instalado.
+
+### Guía Paso a Paso
+
+1. **Clonar o transferir el proyecto** a tu servidor Ubuntu:
 
    ```bash
    git clone https://github.com/zerok06/agentes-ai-soc-collector.git /opt/qradar-collector
    cd /opt/qradar-collector
    ```
 
-2. **Configure your Secrets (`.env`)**
-   Copy the example environment file and fill in your actual production tokens.
+2. **Configurar tus Secretos (`.env`)**
+   Copia el archivo de entorno de ejemplo y completa tus tokens de producción reales.
    ```bash
    cp .env.example .env
    nano .env
    ```
    ```bash
-   # Copy .env file
+   # Copiar archivo .env
    QRADAR_BASE_URL=
    QRADAR_API_TOKEN=
    QRADAR_VERSION=20.0
@@ -76,34 +76,34 @@ The recommended and fully supported deployment method for this collector is via 
    LOG_LEVEL=info
    ```
 
-_Note: Never commit `.env` to source control._
+_Nota: Nunca confirmes (commit) `.env` en el control de código fuente._
 
-3. **Start the Collector in the Background**
-   Build the lightweight Alpine image and start the container in detached mode:
+3. **Iniciar el Recolector en Segundo Plano**
+   Construye la imagen ligera basada en Alpine e inicia el contenedor en modo desconectado (detached):
 
 ```bash
 docker compose up -d --build
 ```
 
-_The `--build` flag ensures the Go binary is freshly compiled._
+_La bandera `--build` garantiza que el binario de Go sea compilado nuevamente._
 
-4. **Verify the Deployment**
-   Check the logs to ensure it successfully connected to QRadar and loaded the state:
+4. **Verificar el Despliegue**
+   Revisa los registros para asegurarte de que se conectó exitosamente a QRadar y cargó el estado:
 
    ```bash
    docker compose logs -f
    ```
 
-   _(Press `Ctrl+C` to exit the logs view)_
+   _(Presiona `Ctrl+C` para salir de la vista de registros)_
 
-5. **Managing the Service**
-   - **Stop the collector:** `docker compose down`
-   - **Restart the collector:** `docker compose restart`
-   - **Check status:** `docker compose ps`
+5. **Gestión del Servicio**
+   - **Detener el recolector:** `docker compose down`
+   - **Reiniciar el recolector:** `docker compose restart`
+   - **Verificar estado:** `docker compose ps`
 
-### Troubleshooting & Logs
+### Solución de Problemas y Registros
 
-All structured JSON logs and connection errors are routed to `stdout` and captured by Docker. You can filter logs natively:
+Todos los registros JSON estructurados y errores de conexión se envían a `stdout` y son capturados por Docker. Puedes filtrar los registros nativamente:
 
 ```bash
 docker compose logs --tail=100 -f
