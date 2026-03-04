@@ -2,9 +2,6 @@
 qradar-collector
 qradar-collector.exe
 
-# State file
-state.json
-
 # Environment
 .env
 
