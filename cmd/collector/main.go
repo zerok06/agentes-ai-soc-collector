@@ -137,13 +137,20 @@ func runPollCycle(
 				}
 
 				log.Debugw("enriching offense", "offense_id", off.ID, "worker", workerID)
+				
+				clientName, err := qClient.GetDomainName(ctx, off.DomainID)
+				if err != nil {
+					log.Warnw("failed to fetch domain name, using fallback", "domain_id", off.DomainID, "error", err)
+					clientName = fmt.Sprintf("Domain-%d", off.DomainID)
+				}
+				
 				events, err := qClient.SearchEvents(ctx, off.ID)
 				if err != nil {
 					log.Errorw("failed Ariel search", "offense_id", off.ID, "error", err)
 					// We continue processing, transform will fallback to offense data
 				}
 
-				payload := transformer.Transform(&off, events)
+				payload := transformer.Transform(&off, events, clientName)
 
 				if err := fwd.Send(ctx, payload); err != nil {
 					log.Errorw("failed to forward offense", "offense_id", off.ID, "error", err)

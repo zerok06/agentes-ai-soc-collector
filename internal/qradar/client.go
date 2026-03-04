@@ -24,10 +24,12 @@ const (
 // Client interacts with the QRadar REST API.
 type Client struct {
 	httpClient *http.Client
-	baseURL    string
-	token      string
-	version    string
-	logger     *zap.SugaredLogger
+	baseURL     string
+	token       string
+	version     string
+	logger      *zap.SugaredLogger
+	domainsMap  map[int64]string
+	domainsMu   sync.RWMutex
 }
 
 // NewClient creates a new QRadar API client with connection pooling.
@@ -47,10 +49,45 @@ func NewClient(baseURL, token, version string, timeoutSec int, tlsInsecure bool,
 			Transport: transport,
 		},
 		baseURL: strings.TrimRight(baseURL, "/"),
-		token:   token,
-		version: version,
-		logger:  logger,
+		token:      token,
+		version:    version,
+		logger:     logger,
+		domainsMap: make(map[int64]string),
 	}
+}
+
+// GetDomainName fetches the human-readable name of a domain/tenant.
+func (c *Client) GetDomainName(ctx context.Context, domainID int64) (string, error) {
+	c.domainsMu.RLock()
+	name, exists := c.domainsMap[domainID]
+	c.domainsMu.RUnlock()
+
+	if exists {
+		return name, nil
+	}
+
+	endpoint := fmt.Sprintf("%s/config/domain_management/domains", c.baseURL)
+	body, err := c.doRequestWithRetry(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("fetching domains: %w", err)
+	}
+
+	var domains []Domain
+	if err := json.Unmarshal(body, &domains); err != nil {
+		return "", fmt.Errorf("decoding domains: %w", err)
+	}
+
+	c.domainsMu.Lock()
+	defer c.domainsMu.Unlock()
+	for _, d := range domains {
+		c.domainsMap[d.ID] = d.Name
+	}
+
+	if name, exists := c.domainsMap[domainID]; exists {
+		return name, nil
+	}
+
+	return "Unknown Tenant", nil
 }
 
 // GetOffenses retrieves offenses updated after the given timestamp.

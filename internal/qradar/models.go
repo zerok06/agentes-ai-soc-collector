@@ -19,6 +19,15 @@ type Offense struct {
 	LocalDestinationAddressIDs []int64     `json:"local_destination_address_ids"`
 	LogSources                 []LogSource `json:"log_sources"`
 	Rules                      []Rule      `json:"rules"`
+	DomainID                   int64       `json:"domain_id"`
+}
+
+// Domain represents a client/tenant domain in QRadar.
+type Domain struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	TenantID    int64  `json:"tenant_id"`
 }
 
 // LogSource represents a log source associated with an offense.
