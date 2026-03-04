@@ -56,6 +56,11 @@ func (m *Manager) load() error {
 		}
 		return fmt.Errorf("reading state file: %w", err)
 	}
+	if len(data) == 0 {
+		m.state = State{LastUpdatedTime: 0}
+		return nil
+	}
+	
 	if err := json.Unmarshal(data, &m.state); err != nil {
 		return fmt.Errorf("parsing state file: %w", err)
 	}
