@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -19,14 +19,10 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o qradar-co
 # Stage 2: Minimal runtime image
 FROM alpine:latest
 
-# Need ca-certificates for outbound HTTPS
-RUN apk --no-cache add ca-certificates tzdata
+# Need ca-certificates for outbound HTTPS and sqlite for debugging
+RUN apk --no-cache add ca-certificates tzdata sqlite
 
 WORKDIR /app
-
-# Non-root user
-RUN adduser -D -g '' collectoruser
-USER collectoruser
 
 COPY --from=builder /app/qradar-collector .
 

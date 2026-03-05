@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Manager provides thread-safe state persistence using SQLite.
@@ -17,7 +17,7 @@ type Manager struct {
 
 // NewManager creates a new SQLite state manager and initializes tables.
 func NewManager(dbPath string) (*Manager, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite check: %w", err)
 	}
