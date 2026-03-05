@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -48,6 +49,7 @@ func main() {
 	if err != nil {
 		log.Fatalw("failed to initialize state manager", "error", err)
 	}
+	defer stateMgr.Close()
 
 	qClient := qradar.NewClient(
 		cfg.QRadar.BaseURL,
@@ -144,6 +146,19 @@ func runPollCycle(
 					return
 				}
 
+				// Strict deduplication: never process an offense we already successfully sent
+				if stateMgr.HasOffense(off.ID) {
+					log.Debugw("offense already processed, skipping", "offense_id", off.ID)
+					
+					// We still want to track highest time just to move the pointer forward
+					highestTimeMu.Lock()
+					if off.LastUpdatedTime > highestTime {
+						highestTime = off.LastUpdatedTime
+					}
+					highestTimeMu.Unlock()
+					continue
+				}
+
 				log.Debugw("enriching offense", "offense_id", off.ID, "worker", workerID)
 				
 				clientName, err := qClient.GetDomainName(ctx, off.DomainID)
@@ -163,6 +178,12 @@ func runPollCycle(
 				if err := fwd.Send(ctx, payload); err != nil {
 					log.Errorw("failed to forward offense", "offense_id", off.ID, "error", err)
 					continue // DO NOT update state time for failed deliveries
+				}
+
+				// Audit log the exact payload sent
+				payloadBytes, _ := json.Marshal(payload)
+				if err := stateMgr.RecordOffense(off.ID, string(payloadBytes)); err != nil {
+					log.Errorw("failed to save offense to audit log", "offense_id", off.ID, "error", err)
 				}
 
 				// Safely track highest successful time

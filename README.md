@@ -8,7 +8,7 @@ Un microservicio de grado de producción escrito en Go que actúa como puente en
 2. **Enriquecimiento de Eventos**: Para cada ofensa activa, genera una búsqueda AQL asíncrona a través de `POST /ariel/searches` para recuperar los detalles asociados del evento, consultando hasta que se complete.
 3. **Transformación de Datos**: Mapea las respuestas de la API de QRadar en un esquema JSON personalizado predefinido.
 4. **Reenvío**: Envía el payload JSON estructurado a la API de destino externa mediante solicitudes `POST`.
-5. **Gestión de Estado**: Rastrea persistentemente la última marca de tiempo procesada en `state.json` para garantizar la capacidad de reanudación precisa después de reinicios.
+5. **Gestión de Estado**: Rastrea persistentemente la última marca de tiempo procesada en `state.db` mediante SQLite para garantizar la capacidad de reanudación precisa y auditoría después de reinicios.
 
 ## Características
 
@@ -24,17 +24,17 @@ Un microservicio de grado de producción escrito en Go que actúa como puente en
 
 La configuración se proporciona de forma nativa a través de un archivo `config.yaml`, pero todos los valores se pueden sobrescribir de forma segura mediante variables de entorno:
 
-| Variable de Entorno     | Descripción                                                                            |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| `QRADAR_BASE_URL`       | URL base de la API de QRadar (ej., `https://qradar.company.local/api`)                 |
-| `QRADAR_API_TOKEN`      | Token de Servicio Autorizado (SEC)                                                     |
-| `QRADAR_VERSION`        | Versión de API objetivo (por defecto: `20.0`)                                          |
-| `QRADAR_TLS_INSECURE`   | Establécelo en `true` para omitir la validación del certificado (por defecto: `false`) |
-| `DESTINATION_URL`       | Endpoint de la API de ingesta externa                                                  |
-| `DESTINATION_API_KEY`   | Clave de API enviada en el encabezado `x-api-key`                                      |
-| `POLL_INTERVAL_SECONDS` | Con qué frecuencia verificar ofensas (por defecto: `60`)                               |
-| `STATE_FILE`            | Archivo local para persistir la marca de tiempo (por defecto: `./state.json`)          |
-| `LOG_LEVEL`             | Nivel de registro: `debug`, `info`, `warn`, `error`                                    |
+| Variable de Entorno     | Descripción                                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| `QRADAR_BASE_URL`       | URL base de la API de QRadar (ej., `https://qradar.company.local/api`)                       |
+| `QRADAR_API_TOKEN`      | Token de Servicio Autorizado (SEC)                                                           |
+| `QRADAR_VERSION`        | Versión de API objetivo (por defecto: `20.0`)                                                |
+| `QRADAR_TLS_INSECURE`   | Establécelo en `true` para omitir la validación del certificado (por defecto: `false`)       |
+| `DESTINATION_URL`       | Endpoint de la API de ingesta externa                                                        |
+| `DESTINATION_API_KEY`   | Clave de API enviada en el encabezado `x-api-key`                                            |
+| `POLL_INTERVAL_SECONDS` | Con qué frecuencia verificar ofensas (por defecto: `60`)                                     |
+| `STATE_FILE`            | Archivo local para persistir la marca de tiempo y usar SQLite DB (por defecto: `./state.db`) |
+| `LOG_LEVEL`             | Nivel de registro: `debug`, `info`, `warn`, `error`                                          |
 
 ---
 

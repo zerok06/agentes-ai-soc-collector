@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   qradar-collector:
     build: .
@@ -7,7 +5,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - ./state.json:/app/state.json
+      - ./state.db:/app/state.db
     environment:
       # These environment variables will override config.yaml if set.
       # You can put secrets here or in a .env file locally.

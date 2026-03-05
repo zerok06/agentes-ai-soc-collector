@@ -1,98 +1,107 @@
 package state
 
 import (
-	"encoding/json"
+	"database/sql"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
+	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-// State holds the persistent collector state.
-type State struct {
-	LastUpdatedTime int64 `json:"last_updated_time"`
-}
-
-// Manager provides thread-safe state persistence.
+// Manager provides thread-safe state persistence using SQLite.
 type Manager struct {
-	mu       sync.Mutex
-	filePath string
-	state    State
+	mu sync.Mutex
+	db *sql.DB
 }
 
-// NewManager creates a new state manager and loads existing state from disk.
-func NewManager(filePath string) (*Manager, error) {
-	m := &Manager{
-		filePath: filePath,
+// NewManager creates a new SQLite state manager and initializes tables.
+func NewManager(dbPath string) (*Manager, error) {
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening sqlite check: %w", err)
 	}
-	if err := m.load(); err != nil {
+
+	m := &Manager{db: db}
+	if err := m.initDB(); err != nil {
 		return nil, err
 	}
+
 	return m, nil
 }
 
-// GetLastUpdatedTime returns the last processed timestamp.
+// initDB creates the necessary schema.
+func (m *Manager) initDB() error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS state (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		last_updated_time INTEGER NOT NULL
+	);
+	
+	CREATE TABLE IF NOT EXISTS offenses_log (
+		offense_id INTEGER PRIMARY KEY,
+		sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		payload TEXT NOT NULL
+	);
+	
+	INSERT OR IGNORE INTO state (id, last_updated_time) VALUES (1, 0);
+	`
+	_, err := m.db.Exec(schema)
+	if err != nil {
+		return fmt.Errorf("initializing db schema: %w", err)
+	}
+	return nil
+}
+
+// GetLastUpdatedTime returns the highest processed timestamp.
 func (m *Manager) GetLastUpdatedTime() int64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.state.LastUpdatedTime
+
+	var t int64
+	err := m.db.QueryRow("SELECT last_updated_time FROM state WHERE id = 1").Scan(&t)
+	if err != nil {
+		return 0
+	}
+	return t
 }
 
-// SetLastUpdatedTime updates and persists the last processed timestamp.
+// SetLastUpdatedTime safely updates the globally highest timestamp.
 func (m *Manager) SetLastUpdatedTime(t int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.state.LastUpdatedTime = t
-	return m.save()
+
+	_, err := m.db.Exec("UPDATE state SET last_updated_time = ? WHERE id = 1", t)
+	return err
 }
 
-// load reads state from disk. Returns zero-state if file does not exist.
-func (m *Manager) load() error {
-	data, err := os.ReadFile(m.filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			m.state = State{LastUpdatedTime: 0}
-			return nil
-		}
-		return fmt.Errorf("reading state file: %w", err)
-	}
-	if len(data) == 0 {
-		m.state = State{LastUpdatedTime: 0}
-		return nil
-	}
-	
-	if err := json.Unmarshal(data, &m.state); err != nil {
-		return fmt.Errorf("parsing state file: %w", err)
-	}
-	return nil
+// RecordOffense adds an offense to the audit log.
+func (m *Manager) RecordOffense(offenseID int64, payload string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	_, err := m.db.Exec(
+		"INSERT OR IGNORE INTO offenses_log (offense_id, sent_at, payload) VALUES (?, ?, ?)",
+		offenseID, time.Now().Format(time.RFC3339), payload,
+	)
+	return err
 }
 
-// save writes state to disk atomically (write to temp → rename).
-func (m *Manager) save() error {
-	data, err := json.MarshalIndent(&m.state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshaling state: %w", err)
-	}
+// HasOffense checks if the offense has already been processed and saved in the audit log.
+func (m *Manager) HasOffense(offenseID int64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	dir := filepath.Dir(m.filePath)
-	tmp, err := os.CreateTemp(dir, "state-*.json.tmp")
+	var exists bool
+	query := "SELECT EXISTS(SELECT 1 FROM offenses_log WHERE offense_id = ? LIMIT 1)"
+	err := m.db.QueryRow(query, offenseID).Scan(&exists)
 	if err != nil {
-		return fmt.Errorf("creating temp state file: %w", err)
+		return false
 	}
-	tmpName := tmp.Name()
+	return exists
+}
 
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return fmt.Errorf("writing temp state file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("closing temp state file: %w", err)
-	}
-	if err := os.Rename(tmpName, m.filePath); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("renaming state file: %w", err)
-	}
-	return nil
+// Close closes the database connection.
+func (m *Manager) Close() error {
+	return m.db.Close()
 }

@@ -23,7 +23,7 @@ fmt:
 clean:
 	go clean
 	rm -f $(BINARY_NAME)
-	rm -f state.json
+	rm -f state.db*
 
 docker-build:
 	docker build -t qradar-collector .

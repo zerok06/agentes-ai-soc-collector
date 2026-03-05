@@ -17,3 +17,7 @@ Thumbs.db
 
 # Go
 vendor/
+
+# Database
+*.db
+*.db-journal
