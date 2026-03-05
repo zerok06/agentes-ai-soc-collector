@@ -14,6 +14,7 @@ services:
       - QRADAR_BASE_URL=${QRADAR_BASE_URL:-https://qradar.company.local/api}
       - QRADAR_API_TOKEN=${QRADAR_API_TOKEN}
       - QRADAR_VERSION=${QRADAR_VERSION:-20.0}
+      - QRADAR_TLS_INSECURE=${QRADAR_TLS_INSECURE:-false}
       - DESTINATION_URL=${DESTINATION_URL:-http://localhost:8001/api/v1/ingest/offense}
       - DESTINATION_API_KEY=${DESTINATION_API_KEY}
       - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-60}
