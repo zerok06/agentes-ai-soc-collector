@@ -11,8 +11,7 @@ type OutputPayload struct {
 // OffenseOutput holds transformed offense fields.
 type OffenseOutput struct {
 	ID          string `json:"id"`
-	Client      string `json:"client"`
-	DomainID    string `json:"domain_id"`
+	Domain      string `json:"domain"`
 	Severity    string `json:"severity"`
 	Magnitude   string `json:"magnitude"`
 	Credibility string `json:"credibility"`
@@ -29,5 +28,4 @@ type EventOutput struct {
 	EventName     string `json:"event_name"`
 	LogSource     string `json:"log_source"`
 	Payload       string `json:"payload"`
-	FileHash      string `json:"file_hash,omitempty"`
 }

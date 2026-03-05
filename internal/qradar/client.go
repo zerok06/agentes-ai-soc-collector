@@ -67,28 +67,22 @@ func (c *Client) GetDomainName(ctx context.Context, domainID int64) (string, err
 		return name, nil
 	}
 
-	endpoint := fmt.Sprintf("%s/config/domain_management/domains", c.baseURL)
+	endpoint := fmt.Sprintf("%s/config/domain_management/domains/%d", c.baseURL, domainID)
 	body, err := c.doRequestWithRetry(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return "", fmt.Errorf("fetching domains: %w", err)
+		return "", fmt.Errorf("fetching domain %d: %w", domainID, err)
 	}
 
-	var domains []Domain
-	if err := json.Unmarshal(body, &domains); err != nil {
-		return "", fmt.Errorf("decoding domains: %w", err)
+	var d Domain
+	if err := json.Unmarshal(body, &d); err != nil {
+		return "", fmt.Errorf("decoding domain %d: %w", domainID, err)
 	}
 
 	c.domainsMu.Lock()
 	defer c.domainsMu.Unlock()
-	for _, d := range domains {
-		c.domainsMap[d.ID] = d.Name
-	}
+	c.domainsMap[d.ID] = d.Name
 
-	if name, exists := c.domainsMap[domainID]; exists {
-		return name, nil
-	}
-
-	return "Unknown Tenant", nil
+	return d.Name, nil
 }
 
 // GetOffenses retrieves offenses updated after the given timestamp and only if they are OPEN.

@@ -38,10 +38,13 @@ func (m *Manager) initDB() error {
 		last_updated_time INTEGER NOT NULL
 	);
 	
-	CREATE TABLE IF NOT EXISTS offenses_log (
-		offense_id INTEGER PRIMARY KEY,
-		sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		payload TEXT NOT NULL
+	CREATE TABLE IF NOT EXISTS audit_log (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		offense_id INTEGER NOT NULL,
+		status TEXT NOT NULL,
+		error_message TEXT,
+		payload TEXT,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	
 	INSERT OR IGNORE INTO state (id, last_updated_time) VALUES (1, 0);
@@ -75,25 +78,25 @@ func (m *Manager) SetLastUpdatedTime(t int64) error {
 	return err
 }
 
-// RecordOffense adds an offense to the audit log.
-func (m *Manager) RecordOffense(offenseID int64, payload string) error {
+// RecordAudit adds an attempt (success or error) to the detailed audit log.
+func (m *Manager) RecordAudit(offenseID int64, status, errMsg, payload string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	_, err := m.db.Exec(
-		"INSERT OR IGNORE INTO offenses_log (offense_id, sent_at, payload) VALUES (?, ?, ?)",
-		offenseID, time.Now().Format(time.RFC3339), payload,
+		"INSERT INTO audit_log (offense_id, status, error_message, payload, created_at) VALUES (?, ?, ?, ?, ?)",
+		offenseID, status, errMsg, payload, time.Now().Format(time.RFC3339),
 	)
 	return err
 }
 
-// HasOffense checks if the offense has already been processed and saved in the audit log.
+// HasOffense checks if the offense has already been processed and successfully sent.
 func (m *Manager) HasOffense(offenseID int64) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var exists bool
-	query := "SELECT EXISTS(SELECT 1 FROM offenses_log WHERE offense_id = ? LIMIT 1)"
+	query := "SELECT EXISTS(SELECT 1 FROM audit_log WHERE offense_id = ? AND status = 'SUCCESS' LIMIT 1)"
 	err := m.db.QueryRow(query, offenseID).Scan(&exists)
 	if err != nil {
 		return false

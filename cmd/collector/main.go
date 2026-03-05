@@ -164,25 +164,28 @@ func runPollCycle(
 				clientName, err := qClient.GetDomainName(ctx, off.DomainID)
 				if err != nil {
 					log.Warnw("failed to fetch domain name, using fallback", "domain_id", off.DomainID, "error", err)
+					_ = stateMgr.RecordAudit(off.ID, "ERROR_DOMAIN", err.Error(), "")
 					clientName = fmt.Sprintf("Domain-%d", off.DomainID)
 				}
 				
 				events, err := qClient.SearchEvents(ctx, off.ID)
 				if err != nil {
 					log.Errorw("failed Ariel search", "offense_id", off.ID, "error", err)
+					_ = stateMgr.RecordAudit(off.ID, "ERROR_ARIEL", err.Error(), "")
 					// We continue processing, transform will fallback to offense data
 				}
 
 				payload := transformer.Transform(&off, events, clientName)
+				payloadBytes, _ := json.Marshal(payload)
 
 				if err := fwd.Send(ctx, payload); err != nil {
 					log.Errorw("failed to forward offense", "offense_id", off.ID, "error", err)
+					_ = stateMgr.RecordAudit(off.ID, "ERROR_FORWARD", err.Error(), string(payloadBytes))
 					continue // DO NOT update state time for failed deliveries
 				}
 
-				// Audit log the exact payload sent
-				payloadBytes, _ := json.Marshal(payload)
-				if err := stateMgr.RecordOffense(off.ID, string(payloadBytes)); err != nil {
+				// Audit log the exact payload sent alongside success status
+				if err := stateMgr.RecordAudit(off.ID, "SUCCESS", "", string(payloadBytes)); err != nil {
 					log.Errorw("failed to save offense to audit log", "offense_id", off.ID, "error", err)
 				}
 
