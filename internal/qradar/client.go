@@ -91,13 +91,17 @@ func (c *Client) GetDomainName(ctx context.Context, domainID int64) (string, err
 	return "Unknown Tenant", nil
 }
 
-// GetOffenses retrieves offenses updated after the given timestamp.
+// GetOffenses retrieves offenses updated after the given timestamp and only if they are OPEN.
 func (c *Client) GetOffenses(ctx context.Context, lastUpdatedTime int64) ([]Offense, error) {
 	endpoint := fmt.Sprintf("%s/siem/offenses", c.baseURL)
+	
+	// Filter by last_updated_time and strictly OPEN status
+	filterStr := `status="OPEN"`
 	if lastUpdatedTime > 0 {
-		endpoint = fmt.Sprintf("%s?filter=%s", endpoint,
-			url.QueryEscape(fmt.Sprintf("last_updated_time>%d", lastUpdatedTime)))
+		filterStr = fmt.Sprintf(`last_updated_time>%d and %s`, lastUpdatedTime, filterStr)
 	}
+	
+	endpoint = fmt.Sprintf("%s?filter=%s", endpoint, url.QueryEscape(filterStr))
 
 	c.logger.Debugw("fetching offenses", "endpoint", endpoint)
 

@@ -81,7 +81,7 @@ func main() {
 	defer ticker.Stop()
 
 	// Initial poll
-	runPollCycle(ctx, log, qClient, fwd, stateMgr, cfg.Collector.WorkerCount)
+	runPollCycle(ctx, log, qClient, fwd, stateMgr, cfg)
 
 	for {
 		select {
@@ -89,7 +89,7 @@ func main() {
 			log.Info("shutting down main loop")
 			return
 		case <-ticker.C:
-			runPollCycle(ctx, log, qClient, fwd, stateMgr, cfg.Collector.WorkerCount)
+			runPollCycle(ctx, log, qClient, fwd, stateMgr, cfg)
 		}
 	}
 }
@@ -100,10 +100,18 @@ func runPollCycle(
 	qClient *qradar.Client,
 	fwd *forwarder.Forwarder,
 	stateMgr *state.Manager,
-	workerCount int,
+	cfg *config.Config,
 ) {
 	startTime := time.Now()
 	lastProcessed := stateMgr.GetLastUpdatedTime()
+
+	// If this is the very first run (state is 0), only fetch from the last polling interval
+	// to avoid downloading years of historical offenses.
+	if lastProcessed == 0 {
+		// QRadar times are in milliseconds
+		lastProcessed = startTime.Add(-time.Duration(cfg.Collector.PollIntervalSeconds) * time.Second).UnixMilli()
+		log.Infow("first run detected, skipping historical offenses", "starting_from_ms", lastProcessed)
+	}
 	
 	log.Debugw("starting poll cycle", "since", lastProcessed)
 
@@ -127,7 +135,7 @@ func runPollCycle(
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < workerCount; i++ {
+	for i := 0; i < cfg.Collector.WorkerCount; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
