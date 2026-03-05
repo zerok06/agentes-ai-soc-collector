@@ -48,7 +48,7 @@ func Load(path string) (*Config, error) {
 	cfg := &Config{
 		Collector: CollectorConfig{
 			PollIntervalSeconds: 60,
-			StateFile:           "./state.db",
+			StateFile:           "./data/state.db",
 			HTTPTimeoutSeconds:  30,
 			WorkerCount:         5,
 		},

@@ -25,6 +25,8 @@ RUN apk --no-cache add ca-certificates tzdata sqlite
 WORKDIR /app
 
 COPY --from=builder /app/qradar-collector .
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
 
 # Default command
-CMD ["./qradar-collector"]
+CMD ["./docker-entrypoint.sh"]

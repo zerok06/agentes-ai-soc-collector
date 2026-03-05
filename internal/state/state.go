@@ -3,6 +3,8 @@ package state
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -17,6 +19,10 @@ type Manager struct {
 
 // NewManager creates a new SQLite state manager and initializes tables.
 func NewManager(dbPath string) (*Manager, error) {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		return nil, fmt.Errorf("creating db directory: %w", err)
+	}
+
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite check: %w", err)

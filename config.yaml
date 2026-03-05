@@ -21,7 +21,7 @@ collector:
   # Polling interval in seconds (env: POLL_INTERVAL_SECONDS)
   poll_interval_seconds: 60
   # File where the highest processed timestamp is stored securely via SQLite.
-  state_file: "./state.db"
+  state_file: "./data/state.db"
   # HTTP client timeout in seconds (env: HTTP_TIMEOUT_SECONDS)
   http_timeout_seconds: 30
   # Number of concurrent workers for processing offenses
