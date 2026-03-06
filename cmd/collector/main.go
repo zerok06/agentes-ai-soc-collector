@@ -114,7 +114,7 @@ func runPollCycle(
 		lastProcessed = startTime.Add(-time.Duration(cfg.Collector.PollIntervalSeconds) * time.Second).UnixMilli()
 		log.Infow("first run detected, skipping historical offenses", "starting_from_ms", lastProcessed)
 	}
-	
+
 	log.Debugw("starting poll cycle", "since", lastProcessed)
 
 	offenses, err := qClient.GetOffenses(ctx, lastProcessed)
@@ -146,10 +146,10 @@ func runPollCycle(
 					return
 				}
 
-				// Strict deduplication: never process an offense we already successfully sent
-				if stateMgr.HasOffense(off.ID) {
-					log.Debugw("offense already processed, skipping", "offense_id", off.ID)
-					
+				// Strict deduplication by VERSION: never process an offense version we already successfully sent
+				if stateMgr.HasOffenseVersion(off.ID, off.LastUpdatedTime) {
+					log.Debugw("offense version already processed, skipping", "offense_id", off.ID, "last_updated_time", off.LastUpdatedTime)
+
 					// We still want to track highest time just to move the pointer forward
 					highestTimeMu.Lock()
 					if off.LastUpdatedTime > highestTime {
@@ -160,18 +160,18 @@ func runPollCycle(
 				}
 
 				log.Debugw("enriching offense", "offense_id", off.ID, "worker", workerID)
-				
+
 				clientName, err := qClient.GetDomainName(ctx, off.DomainID)
 				if err != nil {
 					log.Warnw("failed to fetch domain name, using fallback", "domain_id", off.DomainID, "error", err)
-					_ = stateMgr.RecordAudit(off.ID, "ERROR_DOMAIN", err.Error(), "")
+					_ = stateMgr.RecordAudit(off.ID, off.LastUpdatedTime, "ERROR_DOMAIN", err.Error(), "")
 					clientName = fmt.Sprintf("Domain-%d", off.DomainID)
 				}
-				
+
 				events, err := qClient.SearchEvents(ctx, off.ID)
 				if err != nil {
 					log.Errorw("failed Ariel search", "offense_id", off.ID, "error", err)
-					_ = stateMgr.RecordAudit(off.ID, "ERROR_ARIEL", err.Error(), "")
+					_ = stateMgr.RecordAudit(off.ID, off.LastUpdatedTime, "ERROR_ARIEL", err.Error(), "")
 					// We continue processing, transform will fallback to offense data
 				}
 
@@ -180,12 +180,12 @@ func runPollCycle(
 
 				if err := fwd.Send(ctx, payload); err != nil {
 					log.Errorw("failed to forward offense", "offense_id", off.ID, "error", err)
-					_ = stateMgr.RecordAudit(off.ID, "ERROR_FORWARD", err.Error(), string(payloadBytes))
+					_ = stateMgr.RecordAudit(off.ID, off.LastUpdatedTime, "ERROR_FORWARD", err.Error(), string(payloadBytes))
 					continue // DO NOT update state time for failed deliveries
 				}
 
 				// Audit log the exact payload sent alongside success status
-				if err := stateMgr.RecordAudit(off.ID, "SUCCESS", "", string(payloadBytes)); err != nil {
+				if err := stateMgr.RecordAudit(off.ID, off.LastUpdatedTime, "SUCCESS", "", string(payloadBytes)); err != nil {
 					log.Errorw("failed to save offense to audit log", "offense_id", off.ID, "error", err)
 				}
 
@@ -215,6 +215,11 @@ func runPollCycle(
 		} else {
 			log.Infow("state updated", "new_last_updated_time", highestTime)
 		}
+	}
+
+	// Auto-cleanup: delete audit logs older than 7 days to prevent infinite SQLite growth
+	if err := stateMgr.CleanOldLogs(7); err != nil {
+		log.Errorw("failed to clean old audit logs", "error", err)
 	}
 
 	log.Infow("poll cycle completed", "duration", time.Since(startTime))

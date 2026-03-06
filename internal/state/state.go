@@ -59,6 +59,11 @@ func (m *Manager) initDB() error {
 	if err != nil {
 		return fmt.Errorf("initializing db schema: %w", err)
 	}
+
+	// Safely attempt to add the new column for version tracking if it doesn't exist.
+	// We ignore errors here because the column might already exist.
+	_, _ = m.db.Exec("ALTER TABLE audit_log ADD COLUMN offense_last_updated_time INTEGER DEFAULT 0")
+
 	return nil
 }
 
@@ -85,29 +90,39 @@ func (m *Manager) SetLastUpdatedTime(t int64) error {
 }
 
 // RecordAudit adds an attempt (success or error) to the detailed audit log.
-func (m *Manager) RecordAudit(offenseID int64, status, errMsg, payload string) error {
+func (m *Manager) RecordAudit(offenseID int64, lastUpdatedTime int64, status, errMsg, payload string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	_, err := m.db.Exec(
-		"INSERT INTO audit_log (offense_id, status, error_message, payload, created_at) VALUES (?, ?, ?, ?, ?)",
-		offenseID, status, errMsg, payload, time.Now().Format(time.RFC3339),
+		"INSERT INTO audit_log (offense_id, offense_last_updated_time, status, error_message, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		offenseID, lastUpdatedTime, status, errMsg, payload, time.Now().Format(time.RFC3339),
 	)
 	return err
 }
 
-// HasOffense checks if the offense has already been processed and successfully sent.
-func (m *Manager) HasOffense(offenseID int64) bool {
+// HasOffenseVersion checks if the exact version of the offense has already been successfully sent.
+func (m *Manager) HasOffenseVersion(offenseID int64, lastUpdatedTime int64) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var exists bool
-	query := "SELECT EXISTS(SELECT 1 FROM audit_log WHERE offense_id = ? AND status = 'SUCCESS' LIMIT 1)"
-	err := m.db.QueryRow(query, offenseID).Scan(&exists)
+	query := "SELECT EXISTS(SELECT 1 FROM audit_log WHERE offense_id = ? AND offense_last_updated_time = ? AND status = 'SUCCESS' LIMIT 1)"
+	err := m.db.QueryRow(query, offenseID, lastUpdatedTime).Scan(&exists)
 	if err != nil {
 		return false
 	}
 	return exists
+}
+
+// CleanOldLogs deletes audit log entries older than the specified number of days.
+func (m *Manager) CleanOldLogs(days int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	query := fmt.Sprintf("DELETE FROM audit_log WHERE created_at <= datetime('now', '-%d days')", days)
+	_, err := m.db.Exec(query)
+	return err
 }
 
 // Close closes the database connection.
