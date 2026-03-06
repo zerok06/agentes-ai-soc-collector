@@ -90,25 +90,25 @@ func (m *Manager) SetLastUpdatedTime(t int64) error {
 }
 
 // RecordAudit adds an attempt (success or error) to the detailed audit log.
-func (m *Manager) RecordAudit(offenseID int64, lastUpdatedTime int64, status, errMsg, payload string) error {
+func (m *Manager) RecordAudit(offenseID int64, status, errMsg, payload string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	_, err := m.db.Exec(
-		"INSERT INTO audit_log (offense_id, offense_last_updated_time, status, error_message, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-		offenseID, lastUpdatedTime, status, errMsg, payload, time.Now().Format(time.RFC3339),
+		"INSERT INTO audit_log (offense_id, status, error_message, payload, created_at) VALUES (?, ?, ?, ?, ?)",
+		offenseID, status, errMsg, payload, time.Now().Format(time.RFC3339),
 	)
 	return err
 }
 
-// HasOffenseVersion checks if the exact version of the offense has already been successfully sent.
-func (m *Manager) HasOffenseVersion(offenseID int64, lastUpdatedTime int64) bool {
+// HasOffense checks if the offense has already been processed and successfully sent.
+func (m *Manager) HasOffense(offenseID int64) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var exists bool
-	query := "SELECT EXISTS(SELECT 1 FROM audit_log WHERE offense_id = ? AND offense_last_updated_time = ? AND status = 'SUCCESS' LIMIT 1)"
-	err := m.db.QueryRow(query, offenseID, lastUpdatedTime).Scan(&exists)
+	query := "SELECT EXISTS(SELECT 1 FROM audit_log WHERE offense_id = ? AND status = 'SUCCESS' LIMIT 1)"
+	err := m.db.QueryRow(query, offenseID).Scan(&exists)
 	if err != nil {
 		return false
 	}
